@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triângulo de Duval</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        .container {
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h3 class="font-weight-bold text-center">Análise de Falhas - Método do Triângulo de Duval</h3>
+        <div class="row mb-3 justify-content-center">
+            <div class="col-md-4">
+                <label for="select-oil">Selecione o tipo de Óleo:</label>
+                <select id="select-oil" class="form-control">
+                    <option value="Óleo Mineral">Óleo Mineral</option>
+                    <option value="Óleo Silicone">Óleo Silicone</option>
+                    <option value="Éster BIOTEMP">Éster BIOTEMP</option>
+                    <option value="Éster FR3">Éster FR3</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="num1">Metano (CH4)</label>
+                <input type="number" id="num1" class="form-control" value="0" step="0.1" min="0">
+            </div>
+            <div class="col-md-2">
+                <label for="num2">Acetileno (C2H2)</label>
+                <input type="number" id="num2" class="form-control" value="0" step="0.1" min="0">
+            </div>
+            <div class="col-md-2">
+                <label for="num3">Etileno (C2H4)</label>
+                <input type="number" id="num3" class="form-control" value="0" step="0.1" min="0">
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <p id="analysis1" class="mt-2" style="text-align: left; margin-left: 150px; font-size: large; color: rgb(0, 0, 0); font-weight: bold;"></p>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div id="duval-graph"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateGraph() {
+            const num1 = parseFloat(document.getElementById('num1').value);
+            const num2 = parseFloat(document.getElementById('num2').value);
+            const num3 = parseFloat(document.getElementById('num3').value);
+
+            const selectOil = document.getElementById('select-oil').value;
+
+            function calculatePercentage(val1, val2, val3) {
+                if (val1 + val2 + val3 === 0) {
+                    return null;
+                }
+                const total = val1 + val2 + val3;
+                const p1 = (val1 / total) * 100; // Metano
+                const p2 = (val3 / total) * 100; // Etileno
+                const p3 = (val2 / total) * 100; // Acetileno
+                return [p1, p2, p3];
+            }
+
+            function analyzeRegion(p, oil) {
+                if (!p) return 'Resultado Inconclusivo';
+
+                const [p1, p2, p3] = p;
+
+                if (oil === 'Óleo Mineral') {
+                    if (p1 > 98) {
+                        return "Região de falha - PD – Descargas Parciais do Tipo Corona";
+                    } else if (p2 <= 23 && p3 >= 13) {
+                        return "Região de falha - D1 – Descargas de Baixa Energia (Centelhamento)";
+                    } else if ((p2 > 23 && p2 <= 40 && p3 >= 13 && p3 <= 29) || (p2 > 23 && p3 >= 29)) {
+                        return "Região de falha - D2 – Descargas de Alta Energia (Arco Elétrico)";
+                    } else if ((p2 > 40 && p2 <= 100 && p3 > 15 && p3 < 29) ||
+                            (p2 > 40 && p2 < 50 && p3 >= 13 && p3 <= 15) ||
+                            (p2 < 50 && p3 > 4 && p3 < 13)) {
+                        return "Região de falha - DT – Arco Elétrico e Falta Térmica";
+                    } else if (p2 <= 20 && p2 < 50 && p3 <= 4) {
+                        return "Região de falha - T1 - Falta Térmica < 300ºC (Ponto Quente)";
+                    } else if (p2 > 20 && p2 < 50 && p3 <= 4) {
+                        return "Região de falha - T2 – Falta Térmica entre 300ºC e 500ºC (Ponto Quente)";
+                    } else if (p2 >= 50 && p3 <= 15) {
+                        return "Região de falha - T3 – Falta Térmica >500ºC";
+                    } else {
+                        return "Resultado Inconclusivo pelo Triângulo de Duval";
+                    }
+                } else if (oil === 'Óleo Silicone') {
+                    if (p1 >= 98) {
+                        return "Região de falha - PD – Descargas Parciais do Tipo Corona";
+                    } else if (p2 <= 9 && p3 >= 13) {
+                        return "Região de falha - D1 – Descargas de Baixa Energia (Centelhamento)";
+                    } else if ((p2 > 9 && p2 <= 40 && p3 >= 13 && p3 <= 29) || (p2 > 9 && p3 >= 29)) {
+                        return "Região de falha - D2 – Descargas de Alta Energia (Arco Elétrico)";
+                    } else if ((p2 > 40 && p2 < 46 && p3 > 4 && p3 < 29) ||
+                               (p2 > 0 && p2 < 40 && p3 > 4 && p3 < 13) ||
+                               (p2 > 46 && p3 > 15 && p3 < 29)) {
+                        return "Região de falha - DT – Arco Elétrico e Falta Térmica";
+                    } else if (p3 <= 4 && p1 < 98 && p2 <= 16) {
+                        return "Região de falha - T1 - Falta Térmica < 300ºC (Ponto Quente)";
+                    } else if (p3 <= 4 && p2 > 16 && p2 < 46) {
+                        return "Região de falha - T2 – Falta Térmica entre 300ºC e 500ºC (Ponto Quente)";
+                    } else if (p2 >= 46 && p3 <= 15) {
+                        return "Região de falha - T3 – Falta Térmica >500ºC";
+                    } else {
+                        return "Resultado Inconclusivo pelo Triângulo de Duval";
+                    }
+                } else if (oil === 'Éster BIOTEMP') {
+                    if (p2 <= 20 && p3 >= 13) {
+                        return "Região de falha - D1 – Descargas de Baixa Energia (Centelhamento)";
+                    } else if ((p2 > 20 && p2 <= 40 && p3 >= 13 && p3 <= 29) || (p2 > 20 && p3 >= 29)) {
+                        return "Região de falha - D2 – Descargas de Alta Energia (Arco Elétrico)";
+                    } else if ((p2 > 40 && p2 < 82 && p3 > 4 && p3 < 29) ||
+                               (p2 <= 40 && p3 < 13 && p3 >= 4)) {
+                        return "Região de falha - DT – Arco Elétrico e Falta Térmica";
+                    } else if (p2 <= 52 && p3 < 4 && p1 < 98) {
+                        return "Região de falha - T1 - Falta Térmica < 300ºC (Ponto Quente)";
+                    } else if (p2 >= 52 && p2 < 82 && p3 < 4) {
+                        return "Região de falha - T2 – Falta Térmica entre 300ºC e 500ºC (Ponto Quente)";
+                    } else if (p2 >= 82) {
+                        return "Região de falha - T3 – Falta Térmica >500ºC";
+                    } else if (p1 >= 98) {
+                        return "Região de falha - PD – Descargas Parciais do Tipo Corona";
+                    } else {
+                        return "Resultado Inconclusivo pelo Triângulo de Duval";
+                    }
+                } else if (oil === 'Éster FR3') {
+                    if (p2 <= 25 && p3 >= 13) {
+                        return "Região de falha - D1 – Descargas de Baixa Energia (Centelhamento)";
+                    } else if ((p2 > 25 && p2 <= 40 && p3 >= 13 && p3 <= 29) || (p2 > 25 && p3 >= 29)) {
+                        return "Região de falha - D2 – Descargas de Alta Energia (Arco Elétrico)";
+                    } else if ((p2 > 40 && p2 < 63 && p3 > 4 && p3 < 29) ||
+                               (p2 > 63 && p3 < 29 && p3 > 15) ||
+                               (p2 < 43 && p3 < 13 && p3 >= 4)) {
+                        return "Região de falha - DT – Arco Elétrico e Falta Térmica";
+                    } else if (p2 <= 43 && p3 <= 4 && p1 < 98) {
+                        return "Região de falha - T1 - Falta Térmica < 300ºC (Ponto Quente)";
+                    } else if (p2 > 43 && p2 < 63 && p3 <= 4) {
+                        return "Região de falha - T2 – Falta Térmica entre 300ºC e 500ºC (Ponto Quente)";
+                    } else if (p2 >= 63 && p3 <= 15) {
+                        return "Região de falha - T3 – Falta Térmica >500ºC";
+                    } else if (p1 >= 98) {
+                        return "Região de falha - PD – Descargas Parciais do Tipo Corona";
+                    } else {
+                        return "Resultado Inconclusivo pelo Triângulo de Duval";
+                    }
+                } else {
+                    return "Resultado Inconclusivo pelo Triângulo de Duval";
+                }
+            }
+
+            const point = calculatePercentage(num1, num2, num3);
+            document.getElementById('analysis1').textContent = analyzeRegion(point, selectOil);
+
+            const areas = {
+               "Óleo Mineral": [
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [98, 1, 98],
+                        b: [0, 0, 2],
+                        c: [2, 0, 0],
+                        fill: 'toself',
+                        fillcolor: 'rgba(141, 211, 199, 0.7)',
+                        name: 'PD - Descargas Parciais'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [0, 0, 64, 87], 
+                        b: [1, 77, 13, 13], 
+                        c: [0, 23, 23, 0],
+                        fill: 'toself',
+                        fillcolor: 'rgba(255, 255, 179, 0.7)',
+                        name: 'D1 – Descargas de Baixa Energia (Centelhamento)'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [0, 0, 31, 47, 64], 
+                        b: [77, 29, 29, 13, 13], 
+                        c: [23, 71, 40, 40, 23],
+                        fill: 'toself',
+                        fillcolor: 'rgba(190, 186, 218, 1)',
+                        line: { color: 'purple' },
+                        name: 'D2 – Descargas de Alta Energia (Arco Elétrico)'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [0, 0, 35, 46, 96, 87, 47, 31], 
+                        b: [29, 15, 15, 4, 4, 13, 13, 29], 
+                        c: [71, 85, 50, 50, 0, 0, 40, 40],
+                        fill: 'toself',
+                        fillcolor: 'rgba(251, 128, 114, 1)',
+                        name: 'DT – Arco Elétrico e Falta Térmica'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [76, 80, 98, 98, 96],
+                        b: [4, 0, 0, 2, 4],
+                        c: [20, 20, 2, 0, 0],
+                        fill: 'toself',
+                        fillcolor: 'rgba(0, 39, 164, 0.5)',
+                        name: 'T1 - Falta Térmica < 300ºC (Ponto Quente)'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [46, 50, 80, 76], 
+                        b: [4, 0, 0, 4], 
+                        c: [50, 50, 20, 20], 
+                        fill: 'toself',
+                        fillcolor: 'rgba(201, 103, 0, 0.5)',
+                        name: 'T2 – Falta Térmica entre 300ºC e 500ºC (Ponto Quente)'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [0, 0, 50, 35], 
+                        b: [15, 0, 0, 15], 
+                        c: [85, 1, 50, 50],  
+                        fill: 'toself',
+                        fillcolor: 'rgba(179, 222, 105, 0.8)',
+                        line: { color: 'green' },
+                        name: 'T3 – Falta Térmica >500ºC'
+                    },
+                ],
+
+                "Óleo Silicone": [
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [98,1,98], 
+                        b: [2,0,0], 
+                        c: [0,0,2],
+                        fill: 'toself',
+                        fillcolor: 'rgba(141, 211, 199, 0.7)',
+                        name: 'PD - Descargas Parciais'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [0,0,87,77], 
+                        b: [91,1,13,13], 
+                        c: [9,0,0,9],
+                        fill: 'toself',
+                        fillcolor: 'rgba(255, 255, 179, 0.7)',
+                        name: 'D1 – Descargas de Baixa Energia (Centelhamento)'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [0,0,77,47,31], 
+                        b: [29,91,13,13,29], 
+                        c: [71,9,9,39,39],
+                        fill: 'toself',
+                        fillcolor: 'rgba(190, 186, 218, 1)',
+                        line: { color: 'purple' },
+                        name: 'D2 – Descargas de Alta Energia (Arco Elétrico)'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [0,0,31,47,87,97,50,39], 
+                        b: [15,29,29,13,13,4,4,15], 
+                        c: [85,71,39,39,0,0,46,45],
+                        fill: 'toself',
+                        fillcolor: 'rgba(251, 128, 114, 1)',
+                        name: 'DT – Arco Elétrico e Falta Térmica'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [84,80,97,98,98], 
+                        b: [0,4,4,2,0], 
+                        c: [16,16,0,0,2], 
+                        fill: 'toself',
+                        fillcolor: 'rgba(0, 39, 164, 0.5)',
+                        name: 'T1 - Falta Térmica < 300ºC (Ponto Quente)'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [54,50,80,84], 
+                        b: [0,4,4,0], 
+                        c: [46,46,16,16], 
+                        fill: 'toself',
+                        fillcolor: 'rgba(201, 103, 0, 0.5)',
+                        name: 'T2 – Falta Térmica entre 300ºC e 500ºC (Ponto Quente)'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [0,0,39,54], 
+                        b: [0,15,15,0], 
+                        c: [1,85,45,46],  
+                        fill: 'toself',
+                        fillcolor: 'rgba(179, 222, 105, 0.8)',
+                        line: { color: 'green' },
+                        name: 'T3 – Falta Térmica >500ºC'
+                    },
+                ],
+
+                "Éster BIOTEMP": [
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [98,1,98], 
+                        b: [2,0,0], 
+                        c: [0,0,2],
+                        fill: 'toself',
+                        fillcolor: 'rgba(141, 211, 199, 0.7)',
+                        name: 'PD - Descargas Parciais'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [0,0,87,67], 
+                        b: [80,1,13,13], 
+                        c: [20,0,0,20],
+                        fill: 'toself',
+                        fillcolor: 'rgba(255, 255, 179, 0.7)',
+                        name: 'D1 – Descargas de Baixa Energia (Centelhamento)'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [0,0,67,47,31], 
+                        b: [29,80,13,13,29], 
+                        c: [71,20,20,39,39],
+                        fill: 'toself',
+                        fillcolor: 'rgba(190, 186, 218, 1)',
+                        line: { color: 'purple' },
+                        name: 'D2 – Descargas de Alta Energia (Arco Elétrico)'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [0,0,31,47,87,97,14], 
+                        b: [19,29,29,13,13,4,4], 
+                        c: [81,71,39,39,0,0,81],
+                        fill: 'toself',
+                        fillcolor: 'rgba(251, 128, 114, 1)',
+                        name: 'DT – Arco Elétrico e Falta Térmica'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [48,44,97,98,98], 
+                        b: [0,4,4,2,0], 
+                        c: [52,52,0,0,2], 
+                        fill: 'toself',
+                        fillcolor: 'rgba(0, 39, 164, 0.5)',
+                        name: 'T1 - Falta Térmica < 300ºC (Ponto Quente)'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [15,14,44,48], 
+                        b: [0,4,4,0], 
+                        c: [81,81,52,52], 
+                        fill: 'toself',
+                        fillcolor: 'rgba(201, 103, 0, 0.5)',
+                        name: 'T2 – Falta Térmica entre 300ºC e 500ºC (Ponto Quente)'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [0,0,14,15], 
+                        b: [0,19,4,0], 
+                        c: [1,81,81,81],  
+                        fill: 'toself',
+                        fillcolor: 'rgba(179, 222, 105, 0.8)',
+                        line: { color: 'green' },
+                        name: 'T3 – Falta Térmica >500ºC'
+                    },
+                ],
+
+                "Éster FR3": [
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [98,1,98], 
+                        b: [2,0,0], 
+                        c: [0,0,2],
+                        fill: 'toself',
+                        fillcolor: 'rgba(141, 211, 199, 0.7)',
+                        name: 'PD - Descargas Parciais'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [0,0,87,62], 
+                        b: [75,1,13,13], 
+                        c: [25,0,0,25],
+                        fill: 'toself',
+                        fillcolor: 'rgba(255, 255, 179, 0.7)',
+                        name: 'D1 – Descargas de Baixa Energia (Centelhamento)'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [0,0,62,47,31], 
+                        b: [29,75,13,13,29], 
+                        c: [71,25,25,39,39],
+                        fill: 'toself',
+                        fillcolor: 'rgba(190, 186, 218, 1)',
+                        line: { color: 'purple' },
+                        name: 'D2 – Descargas de Alta Energia (Arco Elétrico)'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [0,0,31,47,87,97,33,22], 
+                        b: [15,29,29,13,13,4,4,15], 
+                        c: [85,71,39,39,0,0,62,62],
+                        fill: 'toself',
+                        fillcolor: 'rgba(251, 128, 114, 1)',
+                        name: 'DT – Arco Elétrico e Falta Térmica'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [57,53,97,98,98], 
+                        b: [0,4,4,2,0], 
+                        c: [43,43,0,0,2], 
+                        fill: 'toself',
+                        fillcolor: 'rgba(0, 39, 164, 0.5)',
+                        name: 'T1 - Falta Térmica < 300ºC (Ponto Quente)'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [37,33,53,57], 
+                        b: [0,4,4,0], 
+                        c: [62,62,43,43], 
+                        fill: 'toself',
+                        fillcolor: 'rgba(201, 103, 0, 0.5)',
+                        name: 'T2 – Falta Térmica entre 300ºC e 500ºC (Ponto Quente)'
+                    },
+                    {
+                        type: 'scatterternary',
+                        mode: 'lines',
+                        a: [0,0,22,37], 
+                        b: [0,15,15,0], 
+                        c: [1,85,62,62], 
+                        fill: 'toself',
+                        fillcolor: 'rgba(179, 222, 105, 0.8)',
+                        line: { color: 'green' },
+                        name: 'T3 – Falta Térmica >500ºC'
+                    },
+                ],
+            };
+
+            const data = [
+                ...areas[selectOil],
+                point && {
+                    type: 'scatterternary',
+                    mode: 'markers+text',
+                    a: [point[0]],
+                    b: [point[2]],
+                    c: [point[1]],
+                    marker: { color: 'black', size: 10 },
+                    text: analyzeRegion(point, selectOil).split(' ')[4].bold(),
+                    textposition: 'top center',
+                    name: 'Ponto'
+                }
+            ].filter(Boolean);
+
+            const layout = {
+                ternary: {
+                    sum: 100,
+                    aaxis: { title: 'C2H4 (Etileno)', ticksuffix: '%', min: 0, showgrid: false },
+                    baxis: { title: 'CH4 (Metano)', ticksuffix: '%', min: 0, showgrid: false },
+                    caxis: { title: 'C2H2 (Acetileno)', ticksuffix: '%', min: 0, showgrid: false }
+                },
+                height: 700,
+                width: 1050, // Aumentar a largura do gráfico
+                legend: {
+                    x: 1.0, 
+                    y: 0.5,
+                    orientation: 'v' 
+                },
+                margin: {
+                    l: 100, 
+                    r: 0, 
+                    t: 50, 
+                    b: 50  
+                },
+                autosize: true,
+            };
+
+            Plotly.newPlot('duval-graph', data, layout);
+        }
+
+        document.querySelectorAll('input, select').forEach(element => {
+            element.addEventListener('input', updateGraph);
+        });
+
+        updateGraph();
+
+        document.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'F12' || (e.ctrlKey && e.key === 'u')) {
+                e.preventDefault();
+            }
+        });
+
+
+    </script>
+</body>
+</html>
